@@ -1,0 +1,37 @@
+
+// CLE 24'25
+#include <cuda_runtime.h>
+#include <stdio.h>
+#include "common.h"
+// __global__ void helloKernel(){
+// 	printf("Hello from thread(%d, %d) in block (%d, %d)\n", threadIdx.x, threadIdx.y, blockIdx.x, blockIdx.y);
+// }
+
+
+
+
+// canny edge detector code to run on the GPU
+void cannyDevice( const int *h_idata, const int w, const int h,
+                 const int tmin, const int tmax,
+                 const float sigma,
+                 int * h_odata)
+{
+
+	//from the class cuda exercises
+  // set up device
+  int dev = 0;
+
+  cudaDeviceProp deviceProp;
+  CHECK (cudaGetDeviceProperties (&deviceProp, dev));
+  printf("Using Device %d: %s\n", dev, deviceProp.name);
+  CHECK (cudaSetDevice (dev)); // a gpu que vou utilizar
+
+
+	//test cuda devide is running
+	// dim3 block (2, 2);
+	// dim3 grid (1, 1);
+	// helloKernel<<<grid, block>>>();
+	// cudaDeviceSynchronize();
+
+
+	}
