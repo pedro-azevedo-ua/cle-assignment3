@@ -13,8 +13,7 @@ __global__ void non_maximum_supression_cuda(const pixel_t *after_Gx, const pixel
 
 __global__ void first_edges_cuda(const pixel_t *nms, pixel_t *reference,	const int nx, const int ny, const int tmax);
 
-__global__ void hysteresis_edges_cuda(const pixel_t *nms, pixel_t *reference,
-																										 const int nx, const int ny, const int tmin, bool *pchanged);
+__global__ void hysteresis_edges_cuda(const pixel_t *nms, pixel_t *reference, const int nx, const int ny, const int tmin, int *pchanged);
 
 __global__ void convolution_cuda(const pixel_t *in, pixel_t *out, const float *kernel, const int nx, const int ny, const int kn){
 
@@ -52,7 +51,7 @@ __global__ void non_maximum_supression_cuda(const pixel_t *after_Gx, const pixel
 		const int sw = ss + 1;
 		const int se = ss - 1;
 	
-		const float dir = (float)(fmod(atan2(after_Gy[c], after_Gx[c]) + M_PI, M_PI) / M_PI) * 8;
+		const float dir = (float)(fmodf(atan2f(after_Gy[c], after_Gx[c]) + M_PI, M_PI) / M_PI) * 8;
 	
 		if (((dir <= 1 || dir > 7) && G[c] > G[ee] &&
 				 G[c] > G[ww]) || // 0 deg
@@ -73,7 +72,7 @@ __global__ void first_edges_cuda(const pixel_t *nms, pixel_t *reference,	const i
 	int m = threadIdx.x + blockDim.x * blockIdx.x;
 	int n = threadIdx.y + blockDim.y * blockIdx.y;
 
-	size_t c = m;
+	size_t c = m + n * nx;
 	if(m > 0 &&  m < nx - 1 && n > 0 && n < ny - 1) {
 		if(nms[c] >= tmax){
 			reference[c] = MAX_BRIGHTNESS;
@@ -83,13 +82,13 @@ __global__ void first_edges_cuda(const pixel_t *nms, pixel_t *reference,	const i
 	
 }
 
-__global__ void hysteresis_edges_cuda(const pixel_t *nms, pixel_t *reference, const int nx, const int ny, const int tmin, bool *pchanged)
+__global__ void hysteresis_edges_cuda(const pixel_t *nms, pixel_t *reference, const int nx, const int ny, const int tmin, int *pchanged)
 {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int m = blockIdx.x * blockDim.x + threadIdx.x;
+    int n = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (i > 0 && i < nx - 1 && j > 0 && j < ny - 1) {
-        size_t t = i + j * nx;
+    if (m > 0 && m < nx - 1 && n > 0 && n < ny - 1) {
+        size_t t = m + n * nx;
 
         int nbs[8];
         nbs[0] = t - nx;     
@@ -99,14 +98,14 @@ __global__ void hysteresis_edges_cuda(const pixel_t *nms, pixel_t *reference, co
         nbs[4] = nbs[0] + 1; 
         nbs[5] = nbs[0] - 1; 
         nbs[6] = nbs[1] + 1; 
-        nbs[7] = nbs[1] - 1; e
+        nbs[7] = nbs[1] - 1; 
 
         if (nms[t] >= tmin && reference[t] == 0) {
             for (int k = 0; k < 8; k++) {
                 if (reference[nbs[k]] != 0) {
                     reference[t] = MAX_BRIGHTNESS;
-										atomicExch(pchanged, true);
-                    break;
+										atomicExch(pchanged, 1);//prevent reace condition
+										break;
                 }
             }
         }
@@ -137,7 +136,7 @@ void cannyDevice( const int *h_idata, const int w, const int h,
 	
 	// Device memory pointers
 	pixel_t *d_G, *d_after_Gx, *d_after_Gy, *d_nms;
-	int *d_input, *d_output;
+	pixel_t *d_input, *d_output;
 	
 	// Allocate device memory
 	size_t size = nx * ny * sizeof(pixel_t);
@@ -209,14 +208,15 @@ void cannyDevice( const int *h_idata, const int w, const int h,
 	CHECK(cudaDeviceSynchronize());
 
 	int *d_changed;
-	CHECK(cudaMalloc((void **)&d_changed, sizeof(bool)));
+	CHECK(cudaMalloc((void **)&d_changed, sizeof(int)));
 
 	int h_changed;
 	do{
-		h_changed = false;
-		CHECK(cudaMemset(d_changed, &h_changed, sizeof(bool)));
+		h_changed = 0;
+		CHECK(cudaMemset(d_changed, 0, sizeof(int)));
 		hysteresis_edges_cuda<<<grid, block>>>(d_nms, d_output, nx, ny, tmin, d_changed);
-		CHECK(cudaMemcpy(&h_changed, d_changed, sizeof(bool), cudaMemcpyDeviceToHost));
+		CHECK(cudaDeviceSynchronize());
+		CHECK(cudaMemcpy(&h_changed, d_changed, sizeof(int), cudaMemcpyDeviceToHost));
 	} while (h_changed);
 
 	CHECK(cudaMemcpy(h_odata, d_output, size, cudaMemcpyDeviceToHost));
