@@ -158,8 +158,20 @@ void cannyDevice( const int *h_idata, const int w, const int h,
 	int gridDimY = (ny + blockDimY - 1) / blockDimY;
 	dim3 block (16, 16);
 	dim3 grid (gridDimX, gridDimY);
+
+	// Allocate host memory
+	pixel_t *h_input = (pixel_t*)malloc(size);
+	pixel_t *h_output = (pixel_t*)malloc(size);
 	
-	gaussian_filter(d_input, d_output, nx, ny, sigma);
+	// Copy from device to host
+	cudaMemcpy(h_input, d_input, size, cudaMemcpyDeviceToHost);
+	
+	// Run the CPU fupppnction on host memory
+	gaussian_filter(h_input, h_output, nx, ny, sigma);
+	
+	// Copy result back to device
+	cudaMemcpy(d_output, h_output, size, cudaMemcpyHostToDevice);
+	
 
 	//calculate gradiants
 	const float h_Gx[] = {-1, 0, 1,
@@ -181,9 +193,9 @@ void cannyDevice( const int *h_idata, const int w, const int h,
 	convolution_cuda<<<grid, block>>>(d_output, d_after_Gy, d_Gy, nx, ny, 3);
 	CHECK(cudaDeviceSynchronize());
 
-	float *h_after_Gx = (float*)malloc(size);
-	float *h_after_Gy = (float*)malloc(size);
-	float *h_G = (float*)malloc(size);
+	pixel_t *h_after_Gx = (pixel_t*)malloc(size);
+	pixel_t *h_after_Gy = (pixel_t*)malloc(size);
+	pixel_t *h_G = (pixel_t*)malloc(size);
 
 	//copy gradients to host
 	CHECK(cudaMemcpy(h_after_Gx, d_after_Gx, size, cudaMemcpyDeviceToHost));
