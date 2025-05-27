@@ -1,6 +1,4 @@
-
 // Based on CUDA SDK template from NVIDIA
-
 // includes, system
 #include <stdlib.h>
 #include <stdio.h>
@@ -474,3 +472,4 @@ int main( int argc, char** argv)
 
     cudaDeviceReset();
 }
+o
