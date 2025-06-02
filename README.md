@@ -16,4 +16,4 @@ The provided _non maximum suppression_ function refines the detected edges. For 
 
 Similar to the convolution, the CUDA Kernel implementation assign to each thread one pixel, using the `threadIdx`, `blockDim` and `blockIdx` to calculate the index of the pixel assign. Then, performe the same logic as the function provided uses inside the loop.
 
-
+The function has the horizontal and vertical gradients has input, as well has the computed merged gradient, that, firstly, it needs to be copied from the host to the device. Producing the output `d_nms`. (In the beggining of the main funtion, there is space allocated to `d_nms`, `cudaMalloc((void **)&d_nms, size)`, being the size, the size of the image)
