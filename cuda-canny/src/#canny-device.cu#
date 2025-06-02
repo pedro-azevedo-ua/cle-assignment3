@@ -16,6 +16,7 @@ __global__ void first_edges_cuda(const pixel_t *nms, pixel_t *reference,	const i
 __global__ void hysteresis_edges_cuda(const pixel_t *nms, pixel_t *reference, const int nx, const int ny, const int tmin, int *pchanged);
 
 __global__ void convolution_cuda(const pixel_t *in, pixel_t *out, const float *kernel, const int nx, const int ny, const int kn){
+
 	// index of the pixel that the thread will process
 	int m = threadIdx.x + blockDim.x * blockIdx.x;
 	int n = threadIdx.y + blockDim.y * blockIdx.y;
@@ -163,14 +164,21 @@ void cannyDevice( const int *h_idata, const int w, const int h,
 	pixel_t *h_output = (pixel_t*)malloc(size);
 	
 	// Copy from device to host
-	cudaMemcpy(h_input, d_input, size, cudaMemcpyDeviceToHost);
+	//cudaMemcpy(h_input, d_input, size, cudaMemcpyDeviceToHost);
 	
 	// Run the CPU fupppnction on host memory
-	gaussian_filter(h_input, h_output, nx, ny, sigma);
+	//	gaussian_filter(h_input, h_output, nx, ny, sigma);
 	
 	// Copy result back to device
-	cudaMemcpy(d_output, h_output, size, cudaMemcpyHostToDevice);
-	
+	//cudaMemcpy(d_output, h_output, size, cudaMemcpyHostToDevice);
+	// Allocate a host buffer to receive the CPU’s blurred image
+	pixel_t *h_blurred = (pixel_t*)malloc(size);
+
+    // Run your existing CPU Gaussian:
+	gaussian_filter(h_idata, h_blurred, nx, ny, sigma);
+
+   // NOW send the *blurred* image up for Sobel:
+	CHECK(cudaMemcpy(d_input, h_blurred, size, cudaMemcpyHostToDevice))	
 
 	//calculate gradiants
 	const float h_Gx[] = {-1, 0, 1,
@@ -180,7 +188,7 @@ void cannyDevice( const int *h_idata, const int w, const int h,
 	CHECK(cudaMalloc((void **)&d_Gx, 9 * sizeof(float)));
 	CHECK(cudaMemcpy(d_Gx, h_Gx, 9 * sizeof(float), cudaMemcpyHostToDevice));
 
-	convolution_cuda<<<grid, block>>>(d_output, d_after_Gx, d_Gx, nx, ny, 3);
+	convolution_cuda<<<grid, block>>>(d_input, d_after_Gx, d_Gx, nx, ny, 3);
 	CHECK(cudaDeviceSynchronize());
 	
 	const float h_Gy[] = {1, 2, 1,
@@ -189,7 +197,7 @@ void cannyDevice( const int *h_idata, const int w, const int h,
 	float *d_Gy;
 	CHECK(cudaMalloc((void **)&d_Gy, 9 * sizeof(float)));
 	CHECK(cudaMemcpy(d_Gy, h_Gy, 9 * sizeof(float), cudaMemcpyHostToDevice));
-	convolution_cuda<<<grid, block>>>(d_output, d_after_Gy, d_Gy, nx, ny, 3);
+	convolution_cuda<<<grid, block>>>(d_input, d_after_Gy, d_Gy, nx, ny, 3);
 	CHECK(cudaDeviceSynchronize());
 
 	pixel_t *h_after_Gx = (pixel_t*)malloc(size);
