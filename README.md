@@ -1,8 +1,17 @@
 # cle-assignment3
 
+### guassian_filter()
+
+The provided _guassian\_filter_ function calculates the 1D kernel, using guassian filter formula.
+
+To apply to CUDA, first the kernel is generated on the host, this time using the 2D formula, and then applied in chunks by each thread.
+
+This is then followed by waiting for the thread synchronization with cudaDeviceSynchronize.
+
+
 ### convolution()
 
-The provided _convolution_ function performs a 2D convolution operation on an input image, using a given kernel of width kn to produce an outpuy image. It iterates through each pixel of the image (excluding borders. For each pixel, it computes a weighted sum of its neighbors based on the kernel values. This involves two inner nested loops for the kernel elements. 
+The provided _convolution_ function performs a 2D convolution operation on an input image, using a given kernel of width kn to produce an outpuy image. It iterates through each pixel of the image (excluding borders. For each pixel, it computes a weighted sum of its neighbors based on the kernel values. This involves two inner nested loops for the kernel elements.
 
 Using a CUDA kernel, each thread will parallelize the convulotion, assigning each thread to compute the output for a single pixel. So, first it calculates the index of the pixel, using the `threadIdx`, `blockDim` and `blockIdx`. Then check if the pixel is not a boudrie of the image, because it need to be ignore. Then the inner loop is the same as the other implementation.
 
@@ -28,4 +37,5 @@ To call the function, first it is needed to set the output variable in the devic
 
 The provided _hysteresis\_edges_ function performs the edge tracking part of Canny. It iterates through pixels. If a pixel's nms value is above a low threshold (tmin) and it is not yet marked as an edge (reference[t] == 0), it checks its 8 neighbors. If any neighbor is already marked as an edge (reference[nbs[k]] != 0), the current pixel is also marked as an edge (reference[t] = MAX_BRIGHTNESS), and a flag *pchanged is set to true. This function is called repeatedly until no more changes occur.
 
-To adapt to use CUDA, the difference is in the use of the `atomicExch(pchanged, 1)`, that will signal if any thread made a change. this operation writes a value to a memory location and returns the old value at that location, all in one indivisible operation. This prevents race conditions where multiple threads might try to set *pchanged to true simultaneously. It is allocated memory in the device for the variable `d_changed`, which is an integer, that will work as boolean, 1 being true and 0 false. And the `pChanged` will write to this space, and a copy to the host correspondent variable is made (to `h_changed`). It is performed a do-while loop that breaks when no more changes appens, when `d_changed\h_changed` is 0. 
+To adapt to use CUDA, the difference is in the use of the `atomicExch(pchanged, 1)`, that will signal if any thread made a change. this operation writes a value to a memory location and returns the old value at that location, all in one indivisible operation. This prevents race conditions where multiple threads might try to set *pchanged to true simultaneously. It is allocated memory in the device for the variable `d_changed`, which is an integer, that will work as boolean, 1 being true and 0 false. And the `pChanged` will write to this space, and a copy to the host correspondent variable is made (to `h_changed`). It is performed a do-while loop that breaks when no more changes appens, when `d_changed\h_changed` is 0.
+
